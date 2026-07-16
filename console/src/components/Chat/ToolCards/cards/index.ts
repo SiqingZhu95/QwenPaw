@@ -35,6 +35,7 @@ export { default as ListAgentsCard } from "./ListAgentsCard";
 export { default as ChatWithAgentCard } from "./ChatWithAgentCard";
 export { default as SubmitToAgentCard } from "./SubmitToAgentCard";
 export { default as CheckAgentTaskCard } from "./CheckAgentTaskCard";
+export { default as SpawnSubagentCard } from "./SpawnSubagentCard";
 export { default as DelegateExternalAgentCard } from "./DelegateExternalAgentCard";
 export { default as MaterializeSkillCard } from "./MaterializeSkillCard";
 export { default as ShellCard } from "./ShellCard";
@@ -60,6 +61,7 @@ import ListAgentsCard from "./ListAgentsCard";
 import ChatWithAgentCard from "./ChatWithAgentCard";
 import SubmitToAgentCard from "./SubmitToAgentCard";
 import CheckAgentTaskCard from "./CheckAgentTaskCard";
+import SpawnSubagentCard from "./SpawnSubagentCard";
 import DelegateExternalAgentCard from "./DelegateExternalAgentCard";
 import MaterializeSkillCard from "./MaterializeSkillCard";
 import ShellCard from "./ShellCard";
@@ -120,6 +122,7 @@ export const BUILTIN_CARD_REGISTRY: Record<string, BuiltinCardComponent> = {
   chat_with_agent: ChatWithAgentCard,
   submit_to_agent: SubmitToAgentCard,
   check_agent_task: CheckAgentTaskCard,
+  spawn_subagent: SpawnSubagentCard,
   delegate_external_agent: DelegateExternalAgentCard,
 
   // Skills

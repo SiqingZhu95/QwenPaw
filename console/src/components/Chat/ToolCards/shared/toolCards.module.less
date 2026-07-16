@@ -85,6 +85,16 @@
   }
 }
 
+.toolCallLabelClickable {
+  cursor: pointer;
+
+  &:hover {
+    color: var(--ant-color-primary, #1677ff);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
 // Badges — use explicit colors that work on both light and dark backgrounds.
 // The chat-anywhere dark-mode stylesheet applies a blanket
 // `color: rgba(255,255,255,0.85) !important` to all descendant spans

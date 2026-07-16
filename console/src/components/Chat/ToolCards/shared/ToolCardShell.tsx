@@ -21,6 +21,8 @@ export interface ToolCardShellProps {
   title: string;
   /** Optional inline result shown after the title when status === done. */
   inlineResult?: string | null;
+  /** Optional action for clicking the tool title itself. */
+  onTitleClick?: () => void;
   /** Optional badge elements (line counts, diff counts). */
   badges?: React.ReactNode;
   /** Expandable body content. */
@@ -33,6 +35,7 @@ const ToolCardShell: React.FC<ToolCardShellProps> = ({
   icon,
   title,
   inlineResult,
+  onTitleClick,
   badges,
   children,
 }) => {
@@ -58,7 +61,33 @@ const ToolCardShell: React.FC<ToolCardShellProps> = ({
             {icon}
           </span>
         )}
-        <span className={styles.toolCallLabel} title={title}>
+        <span
+          className={`${styles.toolCallLabel} ${
+            onTitleClick ? styles.toolCallLabelClickable : ""
+          }`}
+          title={title}
+          role={onTitleClick ? "button" : undefined}
+          tabIndex={onTitleClick ? 0 : undefined}
+          onClick={
+            onTitleClick
+              ? (event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onTitleClick();
+                }
+              : undefined
+          }
+          onKeyDown={
+            onTitleClick
+              ? (event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onTitleClick();
+                }
+              : undefined
+          }
+        >
           {title}
           {isLoading && ` ${t("tool.loading")}`}
         </span>

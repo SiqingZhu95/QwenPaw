@@ -97,6 +97,7 @@ import { openExternalLink } from "../../utils/openExternalLink";
 import { getLastEditorCopy } from "../Coding/lastEditorCopy";
 import { useUploadLimitStore } from "../../stores/uploadLimitStore";
 import MessageQueuePanel from "./components/MessageQueuePanel";
+import SubagentPanel from "./components/SubagentPanel";
 import {
   useMessageQueueStore,
   type QueueItem,
@@ -3016,6 +3017,7 @@ export default function ChatPage() {
           </div>
         </>
       )}
+      <SubagentPanel />
     </div>
   );
 }

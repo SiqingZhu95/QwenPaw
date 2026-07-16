@@ -1,4 +1,25 @@
 {
+  "subagentPanel": {
+    "title": "Subagent sessions",
+    "tab": "Subagent",
+    "task": "Task",
+    "unknownTask": "No task description",
+    "subagent": "Subagent",
+    "user": "User",
+    "spawnTitle": "Spawn subagent {{task}}",
+    "spawnTitleDefault": "Spawn subagent",
+    "sessionLabel": "Session {{id}}",
+    "runningHint": "The subagent is running. Its complete message history will appear when execution finishes.",
+    "loadingHistory": "Loading message history...",
+    "sessionPending": "Waiting for the subagent session record to be persisted...",
+    "noMessages": "No messages in this subagent session",
+    "failed": "Subagent execution failed",
+    "status": {
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed"
+    }
+  },
   "common": {
     "save": "Save",
     "reset": "Reset",

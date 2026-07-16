@@ -33,6 +33,12 @@ export const agentApi = {
 
   getProcessStatus: () => request<unknown>("/agent/admin/status"),
 
+  getTaskStatus: (taskId: string, agentId?: string) =>
+    request<AgentTaskStatus>(
+      `/agent/process/task/${encodeURIComponent(taskId)}`,
+      agentId ? { headers: { "X-Agent-Id": agentId } } : undefined,
+    ),
+
   shutdownSimple: () =>
     request<void>("/agent/shutdown", {
       method: "POST",
@@ -131,3 +137,15 @@ export const agentApi = {
     return response.json();
   },
 };
+
+export interface AgentTaskStatus {
+  status: string;
+  result?: {
+    status?: string;
+    session_id?: string;
+    error?: unknown;
+    [key: string]: unknown;
+  };
+  error?: unknown;
+  [key: string]: unknown;
+}

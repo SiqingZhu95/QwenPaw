@@ -43,7 +43,7 @@ export const chatApi = {
     if (!filename) return "";
     if (filename.startsWith("http://") || filename.startsWith("https://"))
       return filename;
-    let cleaned = filename.replace(/^\/+/, "");
+    const cleaned = filename.replace(/^\/+/, "");
     const path = `${FILES_PREVIEW}/${cleaned}`;
     const url = getApiUrl(path);
 
@@ -54,12 +54,17 @@ export const chatApi = {
 
     return url;
   },
-  listChats: (params?: { user_id?: string; channel?: string }) => {
+  listChats: (
+    params?: { user_id?: string; channel?: string },
+    agentId?: string,
+  ) => {
     const searchParams = new URLSearchParams();
     if (params?.user_id) searchParams.append("user_id", params.user_id);
     if (params?.channel) searchParams.append("channel", params.channel);
     const query = searchParams.toString();
-    return request<ChatSpec[]>(`/chats${query ? `?${query}` : ""}`);
+    return request<ChatSpec[]>(`/chats${query ? `?${query}` : ""}`, {
+      headers: agentId ? { "X-Agent-Id": agentId } : undefined,
+    });
   },
 
   createChat: (chat: Partial<ChatSpec>) =>
@@ -68,8 +73,10 @@ export const chatApi = {
       body: JSON.stringify(chat),
     }),
 
-  getChat: (chatId: string) =>
-    request<ChatHistory>(`/chats/${encodeURIComponent(chatId)}`),
+  getChat: (chatId: string, agentId?: string) =>
+    request<ChatHistory>(`/chats/${encodeURIComponent(chatId)}`, {
+      headers: agentId ? { "X-Agent-Id": agentId } : undefined,
+    }),
 
   updateChat: (chatId: string, chat: ChatUpdateRequest) =>
     request<ChatSpec>(`/chats/${encodeURIComponent(chatId)}`, {
