@@ -316,6 +316,7 @@ def convert_model_exception(  # pylint: disable=too-many-return-statements
             "maximum context",
             "context window",
             "too many tokens",
+            "prompt is too long",
         ]
     ):
         return _append_error_detail(

@@ -18,6 +18,7 @@ from agentscope_runtime.engine.schemas.agent_schemas import AgentRequest
 from agentscope_runtime.engine.schemas.exception import (
     AgentException,
     AppBaseException,
+    ModelContextLengthExceededException,
 )
 from dotenv import load_dotenv
 
@@ -36,6 +37,7 @@ from .utils import build_env_context
 from ..channels.schema import DEFAULT_CHANNEL
 from ...agents.react_agent import QwenPawAgent
 from ...exceptions import convert_model_exception
+from ...providers.model_termination import CONTEXT_LIMIT_ERROR_NOTICE
 from ...agents.utils.file_handling import (
     read_text_file_with_encoding_fallback,
 )
@@ -50,6 +52,30 @@ logger = logging.getLogger(__name__)
 
 
 _PRINT_END_SIGNAL = "[END]"
+
+
+async def _build_context_limit_notice(
+    agent: Any,
+    agent_name: str,
+) -> Msg:
+    """Build and retain the assistant message for a rejected request."""
+
+    notice = Msg(
+        name=agent_name,
+        role="assistant",
+        content=CONTEXT_LIMIT_ERROR_NOTICE,
+    )
+
+    memory = getattr(agent, "memory", None)
+    if memory is not None:
+        try:
+            await memory.add(notice)
+        except Exception:
+            # The user should still see the recovery instruction even if an
+            # unusual custom memory backend cannot retain it.
+            logger.exception("Failed to persist context-limit notice")
+
+    return notice
 
 
 async def _cancel_streaming_agent_task(task: asyncio.Task) -> None:
@@ -1003,6 +1029,22 @@ class AgentRunner(Runner):
                 model_name = getattr(agent.model, "model_name", None)
 
             converted = convert_model_exception(e, model_name)
+
+            if isinstance(
+                converted,
+                ModelContextLengthExceededException,
+            ):
+                logger.warning(
+                    "Model request rejected because the context window is "
+                    "full: %s",
+                    e,
+                )
+                notice = await _build_context_limit_notice(
+                    agent,
+                    self.agent_name,
+                )
+                yield notice, True
+                return
 
             # Preserve all original error dump logic
             debug_dump_path = write_query_error_dump(

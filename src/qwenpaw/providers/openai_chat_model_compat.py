@@ -16,6 +16,7 @@ from qwenpaw.local_models.tag_parser import (
     parse_tool_calls_from_text,
     text_contains_tool_call_tag,
 )
+from qwenpaw.providers.model_termination import apply_truncation_notice
 
 
 def _clone_with_overrides(obj: Any, **overrides: Any) -> Any:
@@ -144,6 +145,7 @@ class _SanitizedStream:
         self._stream = stream
         self._ctx_stream: Any | None = None
         self.extra_contents: dict[str, Any] = {}
+        self.finish_reason: str | None = None
 
     async def __aenter__(self) -> "_SanitizedStream":
         self._ctx_stream = await self._stream.__aenter__()
@@ -168,10 +170,13 @@ class _SanitizedStream:
         return _sanitize_stream_item(item)
 
     def _capture_extra_content(self, item: Any) -> None:
-        """Store ``extra_content`` keyed by tool-call id."""
+        """Store finish reason and tool-call ``extra_content``."""
         chunk = getattr(item, "chunk", item)
         choices = getattr(chunk, "choices", None) or []
         for choice in choices:
+            reason = getattr(choice, "finish_reason", None)
+            if isinstance(reason, str) and reason:
+                self.finish_reason = reason
             delta = getattr(choice, "delta", None)
             if not delta:
                 continue
@@ -552,4 +557,7 @@ class OpenAIChatModelCompat(OpenAIChatModel):
                 if extra:
                     parsed.content = list(parsed.content) + extra
 
-            yield parsed
+            yield apply_truncation_notice(
+                parsed,
+                sanitized_response.finish_reason,
+            )

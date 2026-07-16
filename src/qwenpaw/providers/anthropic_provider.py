@@ -19,6 +19,9 @@ from qwenpaw.providers.multimodal_prober import (
     _is_media_keyword_error,
     evaluate_image_probe_answer,
 )
+from qwenpaw.providers.anthropic_chat_model_compat import (
+    AnthropicChatModelCompat,
+)
 from qwenpaw.providers.provider import ModelInfo, Provider
 
 logger = logging.getLogger(__name__)
@@ -230,8 +233,6 @@ class AnthropicProvider(Provider):
             )
 
     def get_chat_model_instance(self, model_id: str) -> ChatModelBase:
-        from agentscope.model import AnthropicChatModel
-
         client_kwargs: Dict[str, Any] = {"base_url": self.base_url}
 
         # Start with any user-defined custom headers
@@ -275,7 +276,7 @@ class AnthropicProvider(Provider):
         )
         max_tokens = effective_generate_kwargs.pop("max_tokens", 16384)
 
-        return AnthropicChatModel(
+        return AnthropicChatModelCompat(
             model_name=model_id,
             max_tokens=max_tokens,
             stream=True,

@@ -476,10 +476,11 @@ def _get_formatter_for_chat_model(
     Returns:
         Corresponding formatter class, defaults to OpenAIChatFormatter
     """
-    return _CHAT_MODEL_FORMATTER_MAP.get(
-        chat_model_class,
-        OpenAIChatFormatter,
-    )
+    for model_class in chat_model_class.__mro__:
+        formatter_class = _CHAT_MODEL_FORMATTER_MAP.get(model_class)
+        if formatter_class is not None:
+            return formatter_class
+    return OpenAIChatFormatter
 
 
 def _substitute_video_blocks(

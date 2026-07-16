@@ -10,6 +10,7 @@ from qwenpaw.providers.openai_chat_model_compat import (
     OpenAIChatModelCompat,
     _sanitize_tool_call,
 )
+from qwenpaw.providers.model_termination import OUTPUT_LIMIT_NOTICE
 
 
 class CompatHarnessOpenAIChatModel(OpenAIChatModelCompat):
@@ -50,13 +51,21 @@ class FakeAsyncStream:
             raise StopAsyncIteration from exc
 
 
-def _make_chunk(tool_calls: list[Any]) -> Any:
+def _make_chunk(
+    tool_calls: list[Any] | None = None,
+    *,
+    content: str | None = None,
+    finish_reason: str | None = None,
+) -> Any:
     delta = SimpleNamespace(
         reasoning_content=None,
-        content=None,
-        tool_calls=tool_calls,
+        content=content,
+        tool_calls=tool_calls or [],
     )
-    choice = SimpleNamespace(delta=delta)
+    choice = SimpleNamespace(
+        delta=delta,
+        finish_reason=finish_reason,
+    )
     return SimpleNamespace(usage=None, choices=[choice])
 
 
@@ -169,3 +178,52 @@ def test_sanitize_tool_call_normalizes_non_string_arguments() -> None:
     assert sanitized_missing_name_and_arguments is not None
     assert sanitized_missing_name_and_arguments.function.name == ""
     assert sanitized_missing_name_and_arguments.function.arguments == ""
+
+
+async def test_length_finish_reason_blocks_repaired_tool_call() -> None:
+    model = CompatHarnessOpenAIChatModel(
+        "dummy",
+        api_key="sk-test",
+        stream=True,
+        stream_tool_parsing=False,
+    )
+    partial_tool_call = SimpleNamespace(
+        index=0,
+        id="call-partial",
+        function=SimpleNamespace(
+            name="write_file",
+            arguments='{"path":"unsafe.txt"',
+        ),
+    )
+    stream = FakeAsyncStream(
+        [
+            _make_chunk(content="partial answer"),
+            _make_chunk([partial_tool_call]),
+            _make_chunk(finish_reason="length"),
+        ],
+    )
+
+    responses = await model.parse_stream_for_test(datetime.now(), stream)
+
+    assert responses
+    final = responses[-1]
+    assert not any(block["type"] == "tool_use" for block in final.content)
+    assert OUTPUT_LIMIT_NOTICE in final.content[-1]["text"]
+
+
+async def test_normal_finish_reason_does_not_add_notice() -> None:
+    model = CompatHarnessOpenAIChatModel(
+        "dummy",
+        api_key="sk-test",
+        stream=True,
+    )
+    stream = FakeAsyncStream(
+        [
+            _make_chunk(content="complete answer"),
+            _make_chunk(finish_reason="stop"),
+        ],
+    )
+
+    responses = await model.parse_stream_for_test(datetime.now(), stream)
+
+    assert responses[-1].content[-1]["text"] == "complete answer"

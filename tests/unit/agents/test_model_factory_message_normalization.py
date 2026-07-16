@@ -73,6 +73,23 @@ def _media_messages() -> list[Msg]:
     ]
 
 
+def test_anthropic_model_subclass_uses_anthropic_formatter() -> None:
+    """Anthropic wrappers must retain the Anthropic wire format."""
+    if AnthropicChatFormatter is None:
+        pytest.skip("AnthropicChatFormatter not available")
+
+    from qwenpaw.providers.anthropic_chat_model_compat import (
+        AnthropicChatModelCompat,
+    )
+
+    assert (
+        model_factory._get_formatter_for_chat_model(
+            AnthropicChatModelCompat,
+        )
+        is AnthropicChatFormatter
+    )
+
+
 def _assert_request_time_stripped(formatter_class) -> None:
     """Helper to assert that media is stripped from normalized messages."""
     original = _media_messages()
