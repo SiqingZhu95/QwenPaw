@@ -122,4 +122,36 @@ describe("SubagentStreamController", () => {
     );
     controller.dispose();
   });
+
+  it("does not retry a missing binding for an already finished tool", async () => {
+    const resolve = vi.fn(async () => ({
+      found: false,
+      retry_after_ms: 500,
+      stream: null,
+    }));
+    const api = {
+      resolve,
+      getMetadata: vi.fn(),
+      connectEvents: vi.fn(),
+    } as unknown as SubagentStreamApiClient;
+    const controller = new SubagentStreamController({
+      key: "key-finished",
+      tabId: "tab-finished",
+      parentToolCallId: "call-finished",
+      owner,
+      waitForBinding: false,
+      api,
+    });
+
+    controller.activate();
+    await vi.waitFor(() => {
+      expect(
+        useSubagentStreamStore.getState().records["key-finished"].status,
+      ).toBe("fallback");
+    });
+
+    expect(resolve).toHaveBeenCalledOnce();
+    expect(resolve).toHaveBeenCalledWith(owner, "call-finished", 0);
+    controller.dispose();
+  });
 });

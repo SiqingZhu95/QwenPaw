@@ -6,6 +6,7 @@ interface ControllerRegistration {
   tabId: string;
   parentToolCallId: string;
   owner: SubagentStreamOwner;
+  waitForBinding?: boolean;
 }
 
 class SubagentStreamControllerRegistry {

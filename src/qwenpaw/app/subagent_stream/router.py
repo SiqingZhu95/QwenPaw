@@ -33,6 +33,7 @@ class SubagentStreamOwnerRequest(BaseModel):
 
 class ResolveSubagentStreamRequest(SubagentStreamOwnerRequest):
     parent_tool_call_id: str = Field(min_length=1)
+    wait_timeout_ms: int = Field(default=1000, ge=0, le=1000)
 
     def binding(self) -> SubagentBindingKey:
         owner = self.owner()
@@ -65,7 +66,7 @@ async def resolve_subagent_stream(
     await _validate_agent(request, body.agent_id)
     snapshot = await get_subagent_stream_manager().wait_for_binding(
         body.binding(),
-        timeout_seconds=1.0,
+        timeout_seconds=body.wait_timeout_ms / 1000,
     )
     return {
         "found": snapshot is not None,

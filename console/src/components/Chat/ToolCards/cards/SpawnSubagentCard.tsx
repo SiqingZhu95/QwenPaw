@@ -60,8 +60,9 @@ const SpawnSubagentCard: React.FC<SpawnSubagentCardProps> = ({
       tabId: content.id,
       parentToolCallId: content.toolCallId,
       owner,
+      waitForBinding: content.status === "calling",
     };
-  }, [agentId, content.id, content.toolCallId]);
+  }, [agentId, content.id, content.status, content.toolCallId]);
 
   const tab = useMemo(
     () => ({

@@ -30,6 +30,7 @@ export class SubagentStreamApiClient {
   resolve(
     owner: SubagentStreamOwner,
     parentToolCallId: string,
+    waitTimeoutMs = 1000,
   ): Promise<ResolveSubagentStreamResponse> {
     return request<ResolveSubagentStreamResponse>("/subagent-streams/resolve", {
       method: "POST",
@@ -37,6 +38,7 @@ export class SubagentStreamApiClient {
       body: JSON.stringify({
         ...ownerBody(owner),
         parent_tool_call_id: parentToolCallId,
+        wait_timeout_ms: waitTimeoutMs,
       }),
     });
   }

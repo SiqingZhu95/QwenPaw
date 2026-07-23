@@ -108,6 +108,7 @@ async def test_resolve_requires_the_complete_owner_binding(monkeypatch):
         parent_user_id="user",
         parent_channel="console",
         parent_tool_call_id="call-1",
+        wait_timeout_ms=0,
     )
 
     result = await router_module.resolve_subagent_stream(

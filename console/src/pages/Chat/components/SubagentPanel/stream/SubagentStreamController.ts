@@ -22,6 +22,7 @@ export interface SubagentStreamControllerOptions {
   tabId: string;
   parentToolCallId: string;
   owner: SubagentStreamOwner;
+  waitForBinding?: boolean;
   api?: SubagentStreamApiClient;
 }
 
@@ -29,6 +30,7 @@ export class SubagentStreamController {
   readonly key: string;
   readonly owner: Readonly<SubagentStreamOwner>;
   private readonly parentToolCallId: string;
+  private readonly waitForBinding: boolean;
   private readonly api: SubagentStreamApiClient;
   private abortController?: AbortController;
   private builder?: SubagentRuntimeBuilderAdapter;
@@ -41,6 +43,7 @@ export class SubagentStreamController {
     this.key = options.key;
     this.owner = Object.freeze({ ...options.owner });
     this.parentToolCallId = options.parentToolCallId;
+    this.waitForBinding = options.waitForBinding !== false;
     this.api = options.api || subagentStreamApi;
     useSubagentStreamStore.getState().ensure({
       key: options.key,
@@ -66,11 +69,18 @@ export class SubagentStreamController {
 
   private async resolveStream(): Promise<string | undefined> {
     useSubagentStreamStore.getState().patch(this.key, { status: "resolving" });
-    for (let attempt = 0; attempt < 6 && !this.disposed; attempt += 1) {
+    const maxAttempts = this.waitForBinding ? 6 : 1;
+    const waitTimeoutMs = this.waitForBinding ? 1000 : 0;
+    for (
+      let attempt = 0;
+      attempt < maxAttempts && !this.disposed;
+      attempt += 1
+    ) {
       try {
         const result = await this.api.resolve(
           this.owner,
           this.parentToolCallId,
+          waitTimeoutMs,
         );
         if (result.found && result.stream) {
           this.builder = new SubagentRuntimeBuilderAdapter(
@@ -83,9 +93,10 @@ export class SubagentStreamController {
           });
           return result.stream.stream_id;
         }
+        if (!this.waitForBinding) break;
         await delay(result.retry_after_ms || 500);
       } catch {
-        if (attempt === 5) break;
+        if (attempt === maxAttempts - 1) break;
         await delay(BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)]);
       }
     }
