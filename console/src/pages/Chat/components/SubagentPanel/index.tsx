@@ -17,6 +17,10 @@ import {
 } from "../../../../stores/subagentPanelStore";
 import styles from "./index.module.less";
 import { extractMessageText } from "./messageUtils";
+import { SubagentStreamView } from "./stream/SubagentStreamView";
+import { subagentStreamControllerRegistry } from "./stream/SubagentStreamControllerRegistry";
+import { useSubagentStreamStore } from "./stream/subagentStreamStore";
+import sessionApi from "../../sessionApi";
 
 const POLL_INTERVAL_MS = 1500;
 const TERMINAL_SUCCESS = new Set(["completed", "succeeded", "finished"]);
@@ -80,7 +84,7 @@ function MessageHistory({ messages }: { messages: Message[] }) {
   );
 }
 
-function SubagentSessionView({ tab }: { tab: SubagentTab }) {
+function LegacySubagentSessionView({ tab }: { tab: SubagentTab }) {
   const { t } = useTranslation();
   const [history, setHistory] = useState<ChatHistory | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -244,6 +248,30 @@ function SubagentSessionView({ tab }: { tab: SubagentTab }) {
   );
 }
 
+function SubagentSessionView({
+  tab,
+  active,
+}: {
+  tab: SubagentTab;
+  active: boolean;
+}) {
+  const streamStatus = useSubagentStreamStore((state) =>
+    tab.streamKey ? state.records[tab.streamKey]?.status : undefined,
+  );
+
+  useEffect(() => {
+    if (!tab.streamKey) return;
+    if (active) subagentStreamControllerRegistry.activate(tab.streamKey);
+    else subagentStreamControllerRegistry.deactivate(tab.streamKey);
+    return () => subagentStreamControllerRegistry.deactivate(tab.streamKey!);
+  }, [active, tab.streamKey]);
+
+  if (tab.streamKey && streamStatus !== "fallback") {
+    return <SubagentStreamView tab={tab} />;
+  }
+  return <LegacySubagentSessionView tab={tab} />;
+}
+
 export default function SubagentPanel() {
   const { t } = useTranslation();
   const open = useSubagentPanelStore((state) => state.open);
@@ -252,6 +280,7 @@ export default function SubagentPanel() {
   const setActiveTab = useSubagentPanelStore((state) => state.setActiveTab);
   const closeTab = useSubagentPanelStore((state) => state.closeTab);
   const closePanel = useSubagentPanelStore((state) => state.closePanel);
+  const currentParentSessionId = sessionApi.getSessionIdentity().sessionId;
 
   const items = useMemo(
     () =>
@@ -265,10 +294,20 @@ export default function SubagentPanel() {
             </span>
           </span>
         ),
-        children: <SubagentSessionView tab={tab} />,
+        children: (
+          <SubagentSessionView
+            tab={tab}
+            active={
+              open &&
+              activeTabId === tab.id &&
+              (!tab.parentSessionId ||
+                tab.parentSessionId === currentParentSessionId)
+            }
+          />
+        ),
         closable: true,
       })),
-    [t, tabs],
+    [activeTabId, currentParentSessionId, open, t, tabs],
   );
 
   if (!open || tabs.length === 0) return null;
@@ -293,7 +332,13 @@ export default function SubagentPanel() {
         items={items}
         onChange={setActiveTab}
         onEdit={(key, action) => {
-          if (action === "remove") closeTab(String(key));
+          if (action === "remove") {
+            const tab = tabs.find((item) => item.id === String(key));
+            if (tab?.streamKey) {
+              subagentStreamControllerRegistry.dispose(tab.streamKey);
+            }
+            closeTab(String(key));
+          }
         }}
       />
     </aside>

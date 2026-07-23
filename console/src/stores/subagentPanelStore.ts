@@ -5,6 +5,10 @@ export type SubagentExecutionStatus = "running" | "completed" | "failed";
 export interface SubagentTab {
   /** Stable tool-call id. The session id is not available yet in foreground mode. */
   id: string;
+  /** Optional composite key owned by the new stream side channel. */
+  streamKey?: string;
+  /** Parent Runtime session captured when this tab was created. */
+  parentSessionId?: string;
   agentId?: string;
   sessionId?: string;
   taskId?: string;
@@ -16,6 +20,8 @@ export interface SubagentTab {
 
 export interface SubagentTabUpdate {
   id: string;
+  streamKey?: string;
+  parentSessionId?: string;
   agentId?: string;
   sessionId?: string;
   taskId?: string;
@@ -40,6 +46,10 @@ interface SubagentPanelState {
 function mergeTab(tab: SubagentTab, update: SubagentTabUpdate): SubagentTab {
   return {
     ...tab,
+    ...(update.streamKey ? { streamKey: update.streamKey } : {}),
+    ...(update.parentSessionId
+      ? { parentSessionId: update.parentSessionId }
+      : {}),
     ...(update.agentId ? { agentId: update.agentId } : {}),
     ...(update.sessionId ? { sessionId: update.sessionId } : {}),
     ...(update.taskId ? { taskId: update.taskId } : {}),

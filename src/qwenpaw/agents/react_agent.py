@@ -413,6 +413,14 @@ class QwenPawAgent(CodingModeMixin, ToolGuardMixin, ReActAgent):
         except Exception as e:  # pylint: disable=broad-except
             logger.warning(f"Failed to register Coding Mode tools: {e}")
 
+        # Optional, fail-open observer for spawn_subagent process events. It
+        # wraps tool execution but never changes ToolResponse chunks.
+        from ..app.subagent_stream import (
+            install_subagent_stream_toolkit_middleware,
+        )
+
+        install_subagent_stream_toolkit_middleware(toolkit)
+
         return toolkit
 
     def _register_skills(

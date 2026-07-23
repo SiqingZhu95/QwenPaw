@@ -65,7 +65,7 @@ function deriveToolStatus(
  *     status: "in_progress" | "completed" | "failed" | ...
  *   }
  */
-function parseV1Props(v1Props: Record<string, unknown>): {
+export function parseV1Props(v1Props: Record<string, unknown>): {
   content: ToolCallContent;
   isStreaming: boolean;
 } {
@@ -115,6 +115,8 @@ function parseV1Props(v1Props: Record<string, unknown>): {
   const toolCallContent: ToolCallContent = {
     type: "tool_call",
     id: toolId,
+    toolCallId:
+      typeof callData.call_id === "string" ? callData.call_id : undefined,
     name: toolName,
     serverLabel: (callData.server_label as string) || undefined,
     params,

@@ -700,6 +700,15 @@ async def spawn_subagent(
             timeout=timeout,
         )
 
+    from ...app.subagent_stream import subagent_stream_tool_bridge
+
+    request_context = (
+        await subagent_stream_tool_bridge.prepare_child_request_context(
+            {},
+            agent_id=current_agent_id,
+            child_session_id=subagent_session_id,
+        )
+    )
     request_payload = {
         "session_id": subagent_session_id,
         "input": [
@@ -708,7 +717,7 @@ async def spawn_subagent(
                 "content": [{"type": "text", "text": task}],
             },
         ],
-        "request_context": {},
+        "request_context": request_context,
     }
 
     if background:
@@ -719,6 +728,7 @@ async def spawn_subagent(
             current_agent_id,
             int(DEFAULT_AGENT_API_TIMEOUT),
         )
+        await subagent_stream_tool_bridge.record_background_submission(result)
         return _tool_text_response(
             format_background_submission_text(
                 result,
@@ -859,6 +869,16 @@ async def _spawn_forked_subagent(
     if worktree_path:
         request_context["fork_project_dir"] = worktree_path
 
+    from ...app.subagent_stream import subagent_stream_tool_bridge
+
+    request_context = (
+        await subagent_stream_tool_bridge.prepare_child_request_context(
+            request_context,
+            agent_id=current_agent_id,
+            child_session_id=fork_session_id,
+            metadata={"fork_branch": worktree_branch},
+        )
+    )
     request_payload: dict = {
         "session_id": fork_session_id,
         "user_id": user_id,
@@ -880,6 +900,7 @@ async def _spawn_forked_subagent(
             current_agent_id,
             int(DEFAULT_AGENT_API_TIMEOUT),
         )
+        await subagent_stream_tool_bridge.record_background_submission(result)
         submission_text = format_background_submission_text(
             result,
             fork_session_id,

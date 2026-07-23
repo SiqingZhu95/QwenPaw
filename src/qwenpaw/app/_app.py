@@ -137,6 +137,7 @@ class DynamicMultiAgentRunner:
         logger.debug("DynamicMultiAgentRunner.stream_query called")
         workspace = None
         run_key = None
+        observer = None
         try:
             workspace = await self._get_workspace(request)
             runner = workspace.runner
@@ -147,14 +148,37 @@ class DynamicMultiAgentRunner:
             run_key = f"ext-{uuid.uuid4().hex}"
             await workspace.task_tracker.register_external_task(run_key)
 
+            # This observer is a fail-open side channel. Its factory also
+            # strips private producer credentials from the request copy before
+            # the real workspace runner and child tools can inspect it.
+            from .subagent_stream import SubagentStreamObserverFactory
+
+            creation = await SubagentStreamObserverFactory().create(
+                request,
+                workspace,
+            )
+            observer = creation.observer
+
             # Delegate to the actual runner's stream_query generator
             count = 0
-            async for item in runner.stream_query(request, *args, **kwargs):
+            async for item in runner.stream_query(
+                creation.request_for_runner,
+                *args,
+                **kwargs,
+            ):
                 count += 1
                 logger.debug(f"Yielding item #{count}: {type(item)}")
+                await observer.observe(item)
                 yield item
+            await observer.finish()
             logger.debug(f"stream_query completed, yielded {count} items")
+        except asyncio.CancelledError as e:
+            if observer is not None:
+                await observer.fail(e)
+            raise
         except Exception as e:
+            if observer is not None:
+                await observer.fail(e)
             logger.error(
                 f"Error in stream_query: {e}",
                 exc_info=True,

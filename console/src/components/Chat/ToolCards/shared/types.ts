@@ -9,6 +9,8 @@ export type ToolCallStatus = "calling" | "done" | "error";
 export interface ToolCallContent {
   type: "tool_call";
   id: string;
+  /** Runtime call id used only for backend correlation; never replaces id. */
+  toolCallId?: string;
   name: string;
   serverLabel?: string;
   params: Record<string, unknown>;

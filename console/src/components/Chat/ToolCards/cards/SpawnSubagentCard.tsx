@@ -10,6 +10,9 @@ import {
 import { stringifyResult } from "../shared/utils";
 import { extractSubagentResultRefs } from "./subagentMetadata";
 import { useAgentStore } from "../../../../stores/agentStore";
+import sessionApi from "../../../../pages/Chat/sessionApi";
+import { createSubagentStreamKey } from "../../../../pages/Chat/components/SubagentPanel/stream/streamKey";
+import { subagentStreamControllerRegistry } from "../../../../pages/Chat/components/SubagentPanel/stream/SubagentStreamControllerRegistry";
 
 export interface SpawnSubagentCardProps {
   content: ToolCallContent;
@@ -42,10 +45,29 @@ const SpawnSubagentCard: React.FC<SpawnSubagentCardProps> = ({
     [content.result],
   );
   const status = toolExecutionStatus(content, !!refs.taskId);
+  const streamRegistration = useMemo(() => {
+    if (!content.toolCallId) return undefined;
+    const identity = sessionApi.getSessionIdentity();
+    if (!agentId || !identity.sessionId) return undefined;
+    const owner = {
+      agentId,
+      parentSessionId: identity.sessionId,
+      parentUserId: identity.userId,
+      parentChannel: identity.channel,
+    };
+    return {
+      key: createSubagentStreamKey(owner, content.toolCallId),
+      tabId: content.id,
+      parentToolCallId: content.toolCallId,
+      owner,
+    };
+  }, [agentId, content.id, content.toolCallId]);
 
   const tab = useMemo(
     () => ({
       id: content.id,
+      streamKey: streamRegistration?.key,
+      parentSessionId: streamRegistration?.owner.parentSessionId,
       agentId,
       sessionId: refs.sessionId,
       taskId: refs.taskId,
@@ -66,6 +88,8 @@ const SpawnSubagentCard: React.FC<SpawnSubagentCardProps> = ({
       refs.sessionId,
       refs.taskId,
       status,
+      streamRegistration?.owner.parentSessionId,
+      streamRegistration?.key,
       t,
       task,
     ],
@@ -75,9 +99,20 @@ const SpawnSubagentCard: React.FC<SpawnSubagentCardProps> = ({
     useSubagentPanelStore.getState().syncTab(tab);
   }, [tab]);
 
+  useEffect(() => {
+    // Resolve eagerly only for the live tool call. Historical cards stay
+    // network-silent until the user explicitly opens their tab.
+    if (streamRegistration && content.status === "calling") {
+      subagentStreamControllerRegistry.prefetch(streamRegistration);
+    }
+  }, [content.status, streamRegistration]);
+
   const openPanel = useCallback(() => {
+    if (streamRegistration) {
+      subagentStreamControllerRegistry.prefetch(streamRegistration);
+    }
     useSubagentPanelStore.getState().openTab(tab);
-  }, [tab]);
+  }, [streamRegistration, tab]);
 
   return (
     <ToolCardShell
