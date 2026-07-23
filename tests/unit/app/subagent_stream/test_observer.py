@@ -82,6 +82,60 @@ async def test_factory_claims_and_strips_private_context_before_runner():
 
 
 @pytest.mark.asyncio
+async def test_factory_claims_runtime_dict_request():
+    manager = SubagentStreamManager()
+    binding = SubagentBindingKey(
+        agent_id="default",
+        parent_session_id="parent",
+        parent_user_id="user",
+        parent_channel="console",
+        parent_tool_call_id="call-runtime-dict",
+    )
+    handle = await manager.register_or_get(
+        binding,
+        fork=False,
+        background=False,
+    )
+    token = handle.producer_token or ""
+    await manager.expect_child(
+        handle.snapshot.stream_id,
+        token,
+        agent_id="default",
+        child_session_id="child-runtime-dict",
+    )
+    request = {
+        "session_id": "child-runtime-dict",
+        "input": [
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": "hello"}],
+            },
+        ],
+        "request_context": {
+            STREAM_ID_CONTEXT_KEY: handle.snapshot.stream_id,
+            PRODUCER_TOKEN_CONTEXT_KEY: token,
+            "source": "runtime",
+        },
+    }
+
+    result = await SubagentStreamObserverFactory(manager).create(
+        request,
+        SimpleNamespace(agent_id="default"),
+    )
+    cleaned = result.request_for_runner["request_context"]
+    assert STREAM_ID_CONTEXT_KEY not in cleaned
+    assert PRODUCER_TOKEN_CONTEXT_KEY not in cleaned
+    assert cleaned["source"] == "runtime"
+    assert STREAM_ID_CONTEXT_KEY in request["request_context"]
+
+    await result.observer.observe({"object": "message", "id": "m-runtime"})
+    await result.observer.finish()
+    snapshot = await manager.resolve(binding)
+    assert snapshot is not None
+    assert snapshot.status == SubagentStreamStatus.COMPLETED
+
+
+@pytest.mark.asyncio
 async def test_invalid_token_still_gets_stripped_and_request_continues():
     manager = SubagentStreamManager()
     request = make_request(

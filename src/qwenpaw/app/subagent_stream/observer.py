@@ -133,7 +133,11 @@ class ObserverCreationResult:
 
 
 def _copy_request_with_clean_context(request: Any) -> tuple[Any, str, str]:
-    original_context = getattr(request, "request_context", None)
+    original_context = (
+        request.get("request_context")
+        if isinstance(request, dict)
+        else getattr(request, "request_context", None)
+    )
     context = (
         dict(original_context) if isinstance(original_context, dict) else {}
     )
