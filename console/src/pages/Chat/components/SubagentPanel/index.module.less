@@ -55,6 +55,10 @@
   :global(.ant-tabs-tabpane) {
     overflow: hidden;
   }
+
+  :global(.ant-tabs-tabpane) {
+    position: relative;
+  }
 }
 
 .tabLabel {
@@ -69,19 +73,26 @@
   }
 }
 
-.tabContent {
-  box-sizing: border-box;
-  height: 100%;
+.tabScrollArea {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
   min-height: 0;
-  max-height: 100%;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tabContent {
+  min-height: 100%;
+  height: auto;
+  box-sizing: border-box;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .statusLine {
