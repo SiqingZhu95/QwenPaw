@@ -43,22 +43,17 @@
   :global(.ant-tabs-tabpane) {
     min-width: 0;
     min-height: 0;
+    height: 100%;
   }
 
   :global(.ant-tabs-content-holder) {
     flex: 1 1 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    overscroll-behavior: contain;
-    scrollbar-gutter: stable;
-    -webkit-overflow-scrolling: touch;
+    overflow: hidden;
   }
 
   :global(.ant-tabs-content),
   :global(.ant-tabs-tabpane) {
-    min-height: 100%;
-    height: auto;
-    overflow: visible;
+    overflow: hidden;
   }
 }
 
@@ -72,6 +67,35 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+}
+
+.subagentChat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.subagentMessageList {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+}
+
+.subagentBubbleListWrapper {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.subagentBubbleListScroll {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable both-edges;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tabContent {

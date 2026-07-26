@@ -17,6 +17,7 @@ import {
 } from "../../../../stores/subagentPanelStore";
 import styles from "./index.module.less";
 import { extractMessageText } from "./messageUtils";
+import { SubagentMessageScroller } from "./SubagentMessageScroller";
 import { SubagentStreamView } from "./stream/SubagentStreamView";
 import { subagentStreamControllerRegistry } from "./stream/SubagentStreamControllerRegistry";
 import { useSubagentStreamStore } from "./stream/subagentStreamStore";
@@ -266,10 +267,15 @@ function SubagentSessionView({
     return () => subagentStreamControllerRegistry.deactivate(tab.streamKey!);
   }, [active, tab.streamKey]);
 
-  if (tab.streamKey && streamStatus !== "fallback") {
-    return <SubagentStreamView tab={tab} />;
-  }
-  return <LegacySubagentSessionView tab={tab} />;
+  return (
+    <SubagentMessageScroller>
+      {tab.streamKey && streamStatus !== "fallback" ? (
+        <SubagentStreamView tab={tab} />
+      ) : (
+        <LegacySubagentSessionView tab={tab} />
+      )}
+    </SubagentMessageScroller>
+  );
 }
 
 export default function SubagentPanel() {
