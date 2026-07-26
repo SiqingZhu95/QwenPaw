@@ -266,15 +266,10 @@ function SubagentSessionView({
     return () => subagentStreamControllerRegistry.deactivate(tab.streamKey!);
   }, [active, tab.streamKey]);
 
-  return (
-    <div className={styles.tabScrollArea} data-subagent-scroll-container="true">
-      {tab.streamKey && streamStatus !== "fallback" ? (
-        <SubagentStreamView tab={tab} />
-      ) : (
-        <LegacySubagentSessionView tab={tab} />
-      )}
-    </div>
-  );
+  if (tab.streamKey && streamStatus !== "fallback") {
+    return <SubagentStreamView tab={tab} />;
+  }
+  return <LegacySubagentSessionView tab={tab} />;
 }
 
 export default function SubagentPanel() {
