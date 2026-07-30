@@ -61,7 +61,7 @@
 
 实现与测试完成后新增：
 
-- `docs/0729-compact-chat-history/05-validation-report.md`
+- `docs/0729-compact-chat-history/06-validation-report.md`
 
 报告记录机器环境、命令、20/30/50MB 指标、分页决策和剩余风险。
 
@@ -172,7 +172,7 @@ Playwright 在 Chromium 中 mock 会话列表与 `GET /api/chats/{id}`，分别�
 
 ## 6. 分页决策规则
 
-完成测试后必须在 `05-validation-report.md` 明确记录“保持全量”或“触发分页”，不能只给原始数字。
+完成测试后必须在 `06-validation-report.md` 明确记录“保持全量”或“触发分页”，不能只给原始数字。
 
 触发分页的证据包括：
 
