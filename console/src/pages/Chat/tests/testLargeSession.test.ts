@@ -147,6 +147,55 @@ function buildLargeMessages(
   return { messages, size };
 }
 
+/** Build an alternating history with an exact UTF-8 JSON byte target. */
+function buildUtf8SizedMessages(targetBytes: number): {
+  messages: Message[];
+  size: number;
+} {
+  const turnCount = 40;
+  const fillerBudget = Math.max(0, targetBytes - 128 * 1024);
+  const fillerPerMessage = Math.floor(fillerBudget / (turnCount * 2));
+  const messages: Message[] = [];
+  for (let turn = 0; turn < turnCount; turn += 1) {
+    messages.push({
+      id: `large-user-${turn}`,
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text: `user-${turn}-` + "u".repeat(fillerPerMessage),
+        },
+      ],
+      metadata: { timestamp: "2026-07-30T00:00:00+00:00" },
+    });
+    messages.push({
+      id: `large-assistant-${turn}`,
+      role: "assistant",
+      content: [
+        {
+          type: "text",
+          text: `assistant-${turn}-` + "a".repeat(fillerPerMessage),
+        },
+      ],
+      metadata: { timestamp: "2026-07-30T00:00:01+00:00" },
+    });
+  }
+
+  const encodedSize = () =>
+    Buffer.byteLength(JSON.stringify(messages), "utf8");
+  const last = messages[messages.length - 1];
+  const lastText = (
+    last.content as Array<{ type: string; text: string }>
+  )[0];
+  const correction = targetBytes - encodedSize();
+  if (correction >= 0) {
+    lastText.text += "z".repeat(correction);
+  } else {
+    lastText.text = lastText.text.slice(0, correction);
+  }
+  return { messages, size: encodedSize() };
+}
+
 /** Build a single huge assistant message (~`bytes`) — pathological case for
  *  any code that assumes message content is small. */
 function buildOneGiantAssistantMessage(bytes: number): Message[] {
@@ -250,6 +299,48 @@ describe("convertMessages — large session regression for #5479", () => {
     }
   });
 });
+
+// Future pagination trigger: keep the full-history GET until repeatable
+// 20MB/30MB/50MB measurements show a loading or retained-memory regression.
+// Then add an additive cursor API plus a formal AgentScope page callback.
+const RUN_LARGE_HISTORY_BENCHMARKS =
+  process.env.QWENPAW_RUN_LARGE_HISTORY_BENCHMARKS === "1";
+
+describe.skipIf(!RUN_LARGE_HISTORY_BENCHMARKS)(
+  "convertMessages - 20MB/30MB/50MB full-history benchmark",
+  () => {
+    it.each([20, 30, 50])(
+      "converts %iMB without crashing",
+      (targetMb) => {
+        const targetBytes = targetMb * 1024 * 1024;
+        const { messages, size } = buildUtf8SizedMessages(targetBytes);
+        const maybeGc = (globalThis as { gc?: () => void }).gc;
+        maybeGc?.();
+        const heapBefore = process.memoryUsage().heapUsed;
+        const started = performance.now();
+        const converted = convertMessages(messages);
+        const elapsedMs = performance.now() - started;
+        const heapAfter = process.memoryUsage().heapUsed;
+
+        expect(Math.abs(size - targetBytes)).toBeLessThanOrEqual(
+          targetBytes * 0.01,
+        );
+        expect(converted.length).toBeGreaterThan(0);
+        expect(elapsedMs).toBeLessThan(30_000);
+        console.info(
+          "COMPACT_CHAT_HISTORY_CONVERT_METRIC",
+          JSON.stringify({
+            targetMb,
+            payloadBytes: size,
+            elapsedMs,
+            heapDeltaBytes: heapAfter - heapBefore,
+          }),
+        );
+      },
+      60_000,
+    );
+  },
+);
 
 // ---------------------------------------------------------------------------
 // 2. Multi-segment streaming — segments must stay SEPARATE blocks
