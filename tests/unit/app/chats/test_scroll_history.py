@@ -23,7 +23,7 @@ def _append_text(
     text: str,
     role: str,
     dedup_key: str,
-    agent_id: str = "default",
+    agent_id: str | None = "default",
 ) -> int:
     return store.append(
         session_id=session_id,
@@ -45,6 +45,7 @@ def test_extract_index_ranges_merges_tiers_and_adjacent_spans():
     scroll = {
         "index": {
             "session_id": "session-1",
+            "agent_id": None,
             "tiers": [
                 [
                     {"seq_lo": 20, "seq_hi": 29, "lines": []},
@@ -66,6 +67,7 @@ def test_extract_index_ranges_accepts_legacy_levels():
     scroll = {
         "index": {
             "session_id": "session-1",
+            "agent_id": None,
             "levels": [
                 [{"seq_lo": 5, "seq_hi": 8, "lines": []}],
             ],
@@ -83,6 +85,7 @@ def test_extract_index_ranges_rejects_other_session():
     scroll = {
         "index": {
             "session_id": "other-session",
+            "agent_id": None,
             "tiers": [
                 [{"seq_lo": 1, "seq_hi": 10, "lines": []}],
             ],
@@ -92,11 +95,39 @@ def test_extract_index_ranges_rejects_other_session():
     assert extract_index_ranges(scroll, session_id="session-1") == []
 
 
+@pytest.mark.parametrize(
+    "index_identity",
+    [
+        {"agent_id": "default"},
+        {"session_id": "session-1", "agent_id": "alternate"},
+    ],
+)
+def test_extract_index_ranges_requires_exact_checkpoint_identity(
+    index_identity: dict,
+):
+    """Missing session and another agent's checkpoint must be rejected."""
+    scroll = {
+        "index": {
+            **index_identity,
+            "tiers": [
+                [{"seq_lo": 1, "seq_hi": 10, "lines": []}],
+            ],
+        },
+    }
+
+    assert extract_index_ranges(
+        scroll,
+        session_id="session-1",
+        agent_id="default",
+    ) == []
+
+
 def test_extract_index_ranges_ignores_invalid_values():
     """Booleans, strings, and reversed spans are not valid seq ranges."""
     scroll = {
         "index": {
             "session_id": "session-1",
+            "agent_id": None,
             "tiers": [
                 [
                     {"seq_lo": True, "seq_hi": 3, "lines": []},
@@ -145,6 +176,14 @@ def test_read_archived_messages_uses_only_indexed_session_ranges(
         dedup_key="other-agent",
         agent_id="alternate",
     )
+    _append_text(
+        store,
+        session_id="session-1",
+        text="must-not-leak-null-agent",
+        role="assistant",
+        dedup_key="null-agent",
+        agent_id=None,
+    )
     last = _append_text(
         store,
         session_id="session-1",
@@ -163,6 +202,7 @@ def test_read_archived_messages_uses_only_indexed_session_ranges(
         scroll_state={
             "index": {
                 "session_id": "session-1",
+                "agent_id": "default",
                 "tiers": [[{
                     "seq_lo": first,
                     "seq_hi": last,
@@ -226,6 +266,7 @@ def test_read_archived_messages_restores_tool_result_and_legacy_text(
         scroll_state={
             "index": {
                 "session_id": "session-1",
+                "agent_id": "default",
                 "tiers": [[{
                     "seq_lo": first,
                     "seq_hi": last,
@@ -260,6 +301,7 @@ def test_read_archived_messages_fails_open_for_unavailable_database(
         scroll_state={
             "index": {
                 "session_id": "session-1",
+                "agent_id": "default",
                 "tiers": [[{
                     "seq_lo": 1,
                     "seq_hi": 2,
@@ -272,6 +314,52 @@ def test_read_archived_messages_fails_open_for_unavailable_database(
     assert messages == []
     if database_state == "missing":
         assert not db_path.exists()
+
+
+def test_read_archived_messages_allows_null_rows_only_for_null_agent(
+    tmp_path: Path,
+):
+    """Legacy null-agent rows require a matching null-agent checkpoint."""
+    store = HistoryStore(tmp_path / "history.db")
+    first = _append_text(
+        store,
+        session_id="session-1",
+        text="legacy-null-agent",
+        role="user",
+        dedup_key="legacy-null",
+        agent_id=None,
+    )
+    last = _append_text(
+        store,
+        session_id="session-1",
+        text="current-agent",
+        role="assistant",
+        dedup_key="current",
+        agent_id="default",
+    )
+    store.close()
+
+    messages = read_archived_messages(
+        workspace_dir=tmp_path,
+        db_filename="history.db",
+        session_id="session-1",
+        agent_id=None,
+        scroll_state={
+            "index": {
+                "session_id": "session-1",
+                "agent_id": None,
+                "tiers": [[{
+                    "seq_lo": first,
+                    "seq_hi": last,
+                    "lines": [],
+                }]],
+            },
+        },
+    )
+
+    assert [message.get_text_content() for message in messages] == [
+        "legacy-null-agent",
+    ]
 
 
 def test_history_rows_to_messages_falls_back_from_invalid_blocks():

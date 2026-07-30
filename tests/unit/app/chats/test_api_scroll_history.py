@@ -13,12 +13,21 @@ from qwenpaw.app.chats.api import get_chat
 from qwenpaw.app.chats.models import ChatSpec
 
 
-def text_message(*, name: str, role: str, text: str) -> Msg:
-    return Msg(
-        name=name,
-        role=role,
-        content=[TextBlock(type="text", text=text)],
-    )
+def text_message(
+    *,
+    name: str,
+    role: str,
+    text: str,
+    message_id: str | None = None,
+) -> Msg:
+    kwargs = {
+        "name": name,
+        "role": role,
+        "content": [TextBlock(type="text", text=text)],
+    }
+    if message_id is not None:
+        kwargs["id"] = message_id
+    return Msg(**kwargs)
 
 
 class FakeManager:
@@ -134,6 +143,57 @@ async def test_get_chat_prepends_archived_before_marker_and_tail(
     assert captured["session_id"] == "session-1"
     assert captured["agent_id"] == "default"
     assert captured["scroll_state"] is scroll_state
+
+
+@pytest.mark.asyncio
+async def test_get_chat_deduplicates_overlapping_archive_ids(
+    tmp_path,
+    monkeypatch,
+):
+    """A damaged boundary must not display the same logical message twice."""
+    overlap = text_message(
+        name="user",
+        role="user",
+        text="overlap",
+        message_id="same-message",
+    )
+    state = {
+        "agent": {
+            "state": AgentState(
+                session_id="session-1",
+                context=[overlap],
+            ).model_dump(mode="json"),
+            "scroll": {
+                "index": {
+                    "session_id": "session-1",
+                    "agent_id": "default",
+                    "tiers": [[{
+                        "seq_lo": 1,
+                        "seq_hi": 1,
+                        "lines": [],
+                    }]],
+                },
+            },
+        },
+    }
+    monkeypatch.setattr(
+        "qwenpaw.app.chats.api.read_archived_messages",
+        lambda **kwargs: [overlap],
+    )
+
+    result = await get_chat(
+        "00000000-0000-0000-0000-000000000001",
+        mgr=FakeManager(),
+        session=FakeSession(state),
+        workspace=fake_workspace(tmp_path),
+    )
+
+    assert [
+        content.text
+        for message in result.messages
+        for content in message.content
+        if content.type == "text"
+    ] == ["overlap"]
 
 
 @pytest.mark.asyncio

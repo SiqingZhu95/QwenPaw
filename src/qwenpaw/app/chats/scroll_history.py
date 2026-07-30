@@ -28,6 +28,7 @@ def extract_index_ranges(
     scroll_state: Mapping[str, Any],
     *,
     session_id: str,
+    agent_id: str | None = None,
 ) -> list[tuple[int, int]]:
     """Extract normalized archived sequence ranges from Scroll state."""
     index = scroll_state.get("index")
@@ -35,7 +36,9 @@ def extract_index_ranges(
         return []
 
     indexed_session = index.get("session_id")
-    if indexed_session and indexed_session != session_id:
+    if indexed_session != session_id:
+        return []
+    if index.get("agent_id") != agent_id:
         return []
 
     tiers = index.get("tiers", index.get("levels", []))
@@ -153,7 +156,11 @@ def read_archived_messages(
     scroll_state: Mapping[str, Any],
 ) -> list[Msg]:
     """Read the current Scroll checkpoint's archived messages, read-only."""
-    ranges = extract_index_ranges(scroll_state, session_id=session_id)
+    ranges = extract_index_ranges(
+        scroll_state,
+        session_id=session_id,
+        agent_id=agent_id,
+    )
     if not ranges:
         return []
 
@@ -165,12 +172,17 @@ def read_archived_messages(
         "(seq BETWEEN ? AND ?)"
         for _ in ranges
     )
-    params: list[Any] = [session_id, agent_id, agent_id]
+    params: list[Any] = [session_id]
+    if agent_id is None:
+        agent_sql = "agent_id IS NULL"
+    else:
+        agent_sql = "agent_id = ?"
+        params.append(agent_id)
     params.extend(value for pair in ranges for value in pair)
     sql = (
         f"SELECT {_SELECT_COLUMNS} FROM conversation_history "
         "WHERE session_id = ? "
-        "AND (? IS NULL OR agent_id IS NULL OR agent_id = ?) "
+        f"AND {agent_sql} "
         f"AND ({range_sql}) ORDER BY seq ASC"
     )
 

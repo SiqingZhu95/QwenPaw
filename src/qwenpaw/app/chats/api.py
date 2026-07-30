@@ -308,7 +308,17 @@ async def get_chat(
             scroll_state=scroll_raw,
         )
         if archived:
-            memories = [*archived, *memories]
+            combined = [*archived, *memories]
+            deduplicated: list[Msg] = []
+            seen_ids: set[str] = set()
+            for message in combined:
+                message_id = getattr(message, "id", None)
+                if message_id and message_id in seen_ids:
+                    continue
+                if message_id:
+                    seen_ids.add(message_id)
+                deduplicated.append(message)
+            memories = deduplicated
 
     messages = agentscope_msg_to_message(memories)
     return ChatHistory(messages=messages, status=status)
