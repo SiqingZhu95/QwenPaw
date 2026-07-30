@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from agentscope.message import Msg
 from agentscope.state import AgentState
 
+from ...utils.io_utils import run_sync_io
 from .session import SafeJSONSession
 from .manager import ChatManager, MAX_BATCH_SIZE
 from .models import (
@@ -18,6 +19,7 @@ from .models import (
     ChatUpdate,
     ChatHistory,
 )
+from .scroll_history import read_archived_messages
 from .utils import agentscope_msg_to_message, parse_legacy_memory_state
 
 logger = logging.getLogger(__name__)
@@ -269,11 +271,13 @@ async def get_chat(
     agent_raw = state.get("agent", {})
     memories: list[Msg] = []
 
+    parsed_agent_state = False
     state_raw = agent_raw.get("state")
     if isinstance(state_raw, dict):
         try:
             agent_state = AgentState.model_validate(state_raw)
             memories = list(agent_state.context)
+            parsed_agent_state = True
         except Exception:
             logger.debug(
                 "Failed to parse agent.state, falling back to legacy",
@@ -285,6 +289,26 @@ async def get_chat(
         memory_raw = agent_raw.get("memory", {})
         if memory_raw:
             memories, _summary = parse_legacy_memory_state(memory_raw)
+
+    scroll_raw = agent_raw.get("scroll")
+    if parsed_agent_state and isinstance(scroll_raw, dict):
+        try:
+            db_filename = (
+                workspace.config.running.light_context_config
+                .scroll_config.db_filename
+            )
+        except Exception:
+            db_filename = "history.db"
+        archived = await run_sync_io(
+            read_archived_messages,
+            workspace_dir=workspace.workspace_dir,
+            db_filename=db_filename,
+            session_id=chat_spec.session_id,
+            agent_id=getattr(workspace, "agent_id", None),
+            scroll_state=scroll_raw,
+        )
+        if archived:
+            memories = [*archived, *memories]
 
     messages = agentscope_msg_to_message(memories)
     return ChatHistory(messages=messages, status=status)
